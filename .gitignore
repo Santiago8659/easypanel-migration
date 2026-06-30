@@ -1,0 +1,10 @@
+# Secretos y artefactos de trabajo
+.env
+.env.local
+_work/
+*.dump
+*.tar
+*.tar.gz
+*.sql.gz
+*.sha256
+test/.env.test
