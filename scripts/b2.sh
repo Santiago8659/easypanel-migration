@@ -10,6 +10,7 @@ set -euo pipefail
 source "$(cd "$(dirname "$0")/.." && pwd)/lib/common.sh"
 load_env
 need_docker
+check_b2_config
 
 cmd="${1:-ls}"; svc="${2:-}"
 case "$cmd" in

@@ -19,6 +19,7 @@ set -euo pipefail
 source "$(cd "$(dirname "$0")/.." && pwd)/lib/common.sh"
 load_env
 need_docker
+check_b2_config
 
 SERVICE="${1:-}"; [ -n "$SERVICE" ] || die "Uso: $0 <servicio> [--recreate] [--backup f] ..."
 shift || true

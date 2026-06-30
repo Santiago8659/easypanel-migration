@@ -16,6 +16,7 @@ step "1) Docker"
 log "Docker disponible y daemon activo."
 
 step "2) Acceso a B2 (bucket: ${B2_BUCKET:-?})"
+check_b2_config
 if awscli s3 ls "s3://${B2_BUCKET}/" >/dev/null 2>&1; then
   mark 0 "B2 accesible: $(s3_base)"
 else

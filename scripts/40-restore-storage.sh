@@ -11,6 +11,7 @@ set -euo pipefail
 source "$(cd "$(dirname "$0")/.." && pwd)/lib/common.sh"
 load_env
 need_docker
+check_b2_config
 
 DST_PATH="${CHATWOOT_STORAGE_PATH:-}"
 BACKUP=""; DRY_RUN=false

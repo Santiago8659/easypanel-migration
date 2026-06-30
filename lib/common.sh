@@ -81,15 +81,31 @@ pgtool() {
     "$PG_IMAGE" "$tool" -h "$host" -p "$port" -U "$user" "$@"
 }
 
+# Valida que las credenciales B2 estén realmente configuradas (no vacías ni
+# placeholders). Corta de inmediato con un mensaje claro si faltan.
+check_b2_config() {
+  local missing=()
+  { [ -n "${B2_BUCKET:-}" ]   && [[ "$B2_BUCKET"   != *mi-bucket* ]]; }      || missing+=("B2_BUCKET")
+  { [ -n "${B2_KEY_ID:-}" ]   && [[ "$B2_KEY_ID"   != tu-key* ]]; }          || missing+=("B2_KEY_ID")
+  { [ -n "${B2_APP_KEY:-}" ]  && [[ "$B2_APP_KEY"  != tu-application* ]]; }   || missing+=("B2_APP_KEY")
+  { [ -n "${B2_ENDPOINT:-}" ] && [[ "$B2_ENDPOINT" != *XXX* ]]; }            || missing+=("B2_ENDPOINT")
+  if [ ${#missing[@]} -gt 0 ]; then
+    die "Credenciales B2 sin configurar en .env: ${missing[*]}. Edítalas y reintenta."
+  fi
+}
+
 # awscli [args...]  -> aws --endpoint-url <B2> [args...]
+# Fail-fast: timeouts cortos y pocos reintentos para no colgarse si B2 no responde.
 awscli() {
   docker run --rm -i ${NET_ARGS[@]+"${NET_ARGS[@]}"} \
     -e AWS_ACCESS_KEY_ID="${B2_KEY_ID:-}" \
     -e AWS_SECRET_ACCESS_KEY="${B2_APP_KEY:-}" \
     -e AWS_DEFAULT_REGION="${B2_REGION:-us-east-1}" \
     -e AWS_S3_ADDRESSING_STYLE=path \
+    -e AWS_MAX_ATTEMPTS="${AWS_MAX_ATTEMPTS:-3}" \
     -v "$WORK_DIR:/work" \
-    "$AWS_IMAGE" --endpoint-url "${B2_ENDPOINT:?Falta B2_ENDPOINT}" "$@"
+    "$AWS_IMAGE" --cli-connect-timeout 10 --cli-read-timeout 120 \
+    --endpoint-url "${B2_ENDPOINT:?Falta B2_ENDPOINT}" "$@"
 }
 
 s3_base() { echo "s3://${B2_BUCKET:?Falta B2_BUCKET}/${B2_PREFIX:-easypanel-migration}"; }
