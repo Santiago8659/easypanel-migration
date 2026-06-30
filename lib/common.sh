@@ -110,6 +110,39 @@ svc_dbname() {
   echo "${!v:-$1}"
 }
 
+# Contenedor (filtro de nombre) para modo exec. Si está definido, los scripts
+# entran al contenedor de la BD con `docker exec` en vez de conectar por red.
+# Recomendado en EasyPanel/Swarm: usa las herramientas pg de la propia BD
+# (versión correcta) y evita problemas de redes overlay.
+svc_container() {
+  local svc=$1 side=$2 up s g
+  up=$(upper "$svc"); s="${up}_${side}_PG_CONTAINER"; g="${side}_PG_CONTAINER"
+  echo "${!s:-${!g:-}}"
+}
+
+# Resuelve el nombre real de un contenedor en ejecución a partir de un filtro.
+resolve_container() {
+  docker ps --filter "name=$1" --format '{{.Names}}' | head -1
+}
+
+# Ejecuta una herramienta de Postgres contra un objetivo, en modo exec o run.
+# Hereda stdin/stdout del llamador (para streaming y captura).
+#   pg_target <container|''> <host> <port> <user> <pass> <pg_dump|pg_restore|psql> [args...]
+# - Si <container> no está vacío  -> docker exec dentro del contenedor (conexión local, sin -h).
+# - Si está vacío                 -> docker run con PG_IMAGE conectando por red (-h host).
+pg_target() {
+  local cont=$1 host=$2 port=$3 user=$4 pass=$5 tool=$6; shift 6
+  if [ -n "$cont" ]; then
+    local cid; cid=$(resolve_container "$cont")
+    [ -n "$cid" ] || die "No hay un contenedor en ejecución que coincida con '$cont'."
+    docker exec -i -e PGPASSWORD="$pass" "$cid" "$tool" -U "$user" "$@"
+  else
+    docker run --rm -i ${NET_ARGS[@]+"${NET_ARGS[@]}"} \
+      -e PGPASSWORD="$pass" -e PGCONNECT_TIMEOUT=15 \
+      "$PG_IMAGE" "$tool" -h "$host" -p "$port" -U "$user" "$@"
+  fi
+}
+
 # sha256 portable (Linux: sha256sum, macOS: shasum -a 256)
 sha256_make() { # <archivo-en-WORK_DIR>  -> crea <archivo>.sha256
   ( cd "$WORK_DIR" && { sha256sum "$1" 2>/dev/null || shasum -a 256 "$1"; } > "$1.sha256" )

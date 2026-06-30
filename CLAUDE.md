@@ -2,6 +2,19 @@
 
 Migración de servicios autoalojados de un servidor **EasyPanel (origen)** a otro **EasyPanel (destino)**.
 
+## ⚠️ REPOSITORIO PÚBLICO — no exponer información sensible
+
+Este repo es **público**. **Nunca** commitear ni escribir en archivos versionados:
+
+- Credenciales: passwords de Postgres, keys de B2, `SECRET_KEY_BASE`, `N8N_ENCRYPTION_KEY`, `DATABASE_URL`, tokens.
+- Datos internos de infraestructura: IPs/hostnames del servidor, nombres reales de proyectos/servicios/contenedores, rutas de volúmenes específicas.
+
+Reglas:
+- Los valores reales viven **solo en el `.env` local** de cada servidor (está en `.gitignore`).
+- `.env.example` es **solo plantilla** con placeholders genéricos (`<proyecto>`, `tu-key-id`, etc.).
+- Antes de cada commit, verifica que no se cuele nada: `git grep -niE 'password=|secret|key_id|app_key|[0-9]{1,3}(\.[0-9]{1,3}){3}'`.
+- Si algún dato sensible llega a aparecer en el chat o en logs, trátalo como secreto: no lo copies a archivos del repo.
+
 ## Objetivo
 
 Mover, sin pérdida de datos, los siguientes servicios:
