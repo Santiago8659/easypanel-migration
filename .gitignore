@@ -8,3 +8,4 @@ _work/
 *.sql.gz
 *.sha256
 test/.env.test
+stack-export/
