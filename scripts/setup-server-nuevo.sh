@@ -96,6 +96,10 @@ fi
 run "sysctl -w vm.swappiness=10 >/dev/null"
 run "grep -q 'vm.swappiness' /etc/sysctl.conf || echo 'vm.swappiness=10' >> /etc/sysctl.conf"
 log "swappiness=10 (swap solo como colchón)."
+# Redis lo exige para que sus snapshots (fork) no fallen bajo presión de memoria
+run "sysctl -w vm.overcommit_memory=1 >/dev/null"
+run "grep -q 'vm.overcommit_memory' /etc/sysctl.conf || echo 'vm.overcommit_memory = 1' >> /etc/sysctl.conf"
+log "overcommit_memory=1 (requisito de Redis)."
 
 step "7/7 Docker + EasyPanel"
 if ! command -v docker >/dev/null 2>&1; then
