@@ -42,8 +42,9 @@ db=$(svc_dbname "$SERVICE"); port="${port:-5432}"; user="${user:-postgres}"
 [ -n "$cont" ] || [ -n "$host" ] || die "Configura $(upper "$SERVICE")_DST_PG_CONTAINER (exec) o DST_PG_HOST (red)."
 
 pg() { pg_target "$cont" "$host" "$port" "$user" "$pass" "$@"; }
+if [ -n "$cont" ]; then tlabel="exec $cont"; else tlabel="red $host:$port"; fi
 
-step "Restore de '$SERVICE' (BD: $db)  [modo: ${cont:+exec $cont}${cont:-red $host:$port}]"
+step "Restore de '$SERVICE' (BD: $db)  [modo: $tlabel]"
 
 if [ -z "$BACKUP" ]; then
   info "Resolviendo backup más reciente (latest.txt)..."

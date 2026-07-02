@@ -40,11 +40,12 @@ db=$(svc_dbname "$SERVICE"); port="${port:-5432}"; user="${user:-postgres}"
 [ -n "$cont" ] || [ -n "$host" ] || die "Configura $(upper "$SERVICE")_SRC_PG_CONTAINER (modo exec) o SRC_PG_HOST (modo red)."
 
 pg() { pg_target "$cont" "$host" "$port" "$user" "$pass" "$@"; }
+if [ -n "$cont" ]; then tlabel="exec $cont"; else tlabel="red $host:$port"; fi
 
 ts=$(date '+%Y%m%d-%H%M%S')
 file="${SERVICE}-${ts}.dump"
 
-step "Dump de '$db' (servicio: $SERVICE)  [modo: ${cont:+exec $cont}${cont:-red $host:$port}]"
+step "Dump de '$db' (servicio: $SERVICE)  [modo: $tlabel]"
 
 info "Comprobando conexión..."
 pg psql -d "$db" -tAc "select 1" >/dev/null || die "No conecta a la BD '$db'. Revisa credenciales/contenedor."

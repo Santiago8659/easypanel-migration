@@ -17,10 +17,11 @@ log "Docker disponible y daemon activo."
 
 step "2) Acceso a B2 (bucket: ${B2_BUCKET:-?})"
 check_b2_config
-if awscli s3 ls "s3://${B2_BUCKET}/" >/dev/null 2>&1; then
+if b2err="$(awscli s3 ls "s3://${B2_BUCKET}/" 2>&1)"; then
   mark 0 "B2 accesible: $(s3_base)"
 else
-  mark 1 "No se pudo listar el bucket B2. Revisa B2_* en .env (endpoint/region/keys)."
+  mark 1 "No se pudo acceder a B2. Error real de aws-cli:"
+  echo "$b2err" | sed 's/^/       /' >&2
 fi
 
 step "3) Conectividad a las BDs"
