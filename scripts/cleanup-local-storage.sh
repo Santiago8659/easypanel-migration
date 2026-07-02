@@ -39,12 +39,18 @@ db=$(svc_dbname "$SERVICE"); port="${port:-5432}"; user="${user:-postgres}"
 [ -n "$cont" ] || [ -n "$host" ] || die "Falta contenedor/host de la BD en .env"
 pg() { pg_target "$cont" "$host" "$port" "$user" "$pass" "$@" </dev/null; }
 
-step "COMPUERTA 1/3: la BD no debe tener blobs 'local'"
-nlocal=$(pg psql -d "$db" -tAc "SELECT count(*) FROM active_storage_blobs WHERE service_name='local';" | tr -d '[:space:]')
-if [ "$nlocal" != "0" ]; then
-  die "Hay $nlocal blobs con service_name='local' (aún se leen del disco). Corre antes mark-blobs-service.sh. NO se borró nada."
+# La compuerta 1 solo aplica al BORRADO: con --check se puede (y conviene)
+# cotejar ANTES del UPDATE de la BD, con los blobs aún en 'local'.
+if $CHECK_ONLY; then
+  step "COMPUERTA 1/3: omitida en modo --check (solo aplica al borrado)"
+else
+  step "COMPUERTA 1/3: la BD no debe tener blobs 'local'"
+  nlocal=$(pg psql -d "$db" -tAc "SELECT count(*) FROM active_storage_blobs WHERE service_name='local';" | tr -d '[:space:]')
+  if [ "$nlocal" != "0" ]; then
+    die "Hay $nlocal blobs con service_name='local' (aún se leen del disco). Corre antes mark-blobs-service.sh. NO se borró nada."
+  fi
+  log "BD OK: 0 blobs en 'local'."
 fi
-log "BD OK: 0 blobs en 'local'."
 
 step "COMPUERTA 2/3: cotejo COMPLETO local vs B2 (rclone check, tamaño+hash)"
 rm -rf "$FLAT"; mkdir -p "$FLAT"
