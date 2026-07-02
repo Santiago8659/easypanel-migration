@@ -83,14 +83,21 @@ pgtool() {
 
 # Valida que las credenciales B2 estén realmente configuradas (no vacías ni
 # placeholders). Corta de inmediato con un mensaje claro si faltan.
+# ¿el valor sigue siendo un placeholder / está vacío?
+_is_placeholder() {
+  case "$1" in
+    ""|TU_*|tu-*|TU-*|PEGA*|pega*|PON_*|pon-*|\<*|*xxxx*|*XXXX*|*XXX*|mi-bucket*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 check_b2_config() {
   local missing=()
-  { [ -n "${B2_BUCKET:-}" ]   && [[ "$B2_BUCKET"   != *mi-bucket* ]]; }      || missing+=("B2_BUCKET")
-  { [ -n "${B2_KEY_ID:-}" ]   && [[ "$B2_KEY_ID"   != tu-key* ]]; }          || missing+=("B2_KEY_ID")
-  { [ -n "${B2_APP_KEY:-}" ]  && [[ "$B2_APP_KEY"  != tu-application* ]]; }   || missing+=("B2_APP_KEY")
-  { [ -n "${B2_ENDPOINT:-}" ] && [[ "$B2_ENDPOINT" != *XXX* ]]; }            || missing+=("B2_ENDPOINT")
+  _is_placeholder "${B2_BUCKET:-}"   && missing+=("B2_BUCKET")
+  _is_placeholder "${B2_KEY_ID:-}"   && missing+=("B2_KEY_ID")
+  _is_placeholder "${B2_APP_KEY:-}"  && missing+=("B2_APP_KEY")
+  _is_placeholder "${B2_ENDPOINT:-}" && missing+=("B2_ENDPOINT")
   if [ ${#missing[@]} -gt 0 ]; then
-    die "Credenciales B2 sin configurar en .env: ${missing[*]}. Edítalas y reintenta."
+    die "Credenciales B2 sin configurar (aún son placeholders) en .env: ${missing[*]}. Pon los valores reales y reintenta."
   fi
 }
 
