@@ -36,7 +36,10 @@ SRC="${CHATWOOT_STORAGE_PATH:?Falta CHATWOOT_STORAGE_PATH en .env}"
 [ -d "$SRC" ] || die "No existe la carpeta de storage: $SRC"
 
 RCLONE_IMAGE="${RCLONE_IMAGE:-rclone/rclone:latest}"
-FLAT="${FLAT_DIR:-/tmp/cw-flat}"
+# El índice plano vive JUNTO a los datos (mismo filesystem): así los hardlinks
+# funcionan siempre y NUNCA se copian datos. Jamás usar /tmp (puede ser tmpfs
+# u otro fs, y un fallback a copia llenaría el disco).
+FLAT="${FLAT_DIR:-$(dirname "$SRC")/.cw-flat-index}"
 DRY_RUN=false; [ "${1:-}" = "--dry-run" ] && DRY_RUN=true
 
 rclone_s3() {
@@ -66,13 +69,23 @@ fi
 
 step "1/3 Creando índice plano (hardlinks; NO duplica datos en disco)"
 rm -rf "$FLAT"; mkdir -p "$FLAT"
-if ! find "$SRC" -mindepth 3 -maxdepth 3 -type f -exec ln -t "$FLAT" {} + 2>/dev/null; then
-  warn "ln -t no disponible; usando fallback por archivo (más lento)."
-  find "$SRC" -mindepth 3 -maxdepth 3 -type f -exec sh -c \
-    'for f; do ln "$f" "'"$FLAT"'/$(basename "$f")" 2>/dev/null || cp "$f" "'"$FLAT"'/"; done' _ {} +
+# Sanity: el hardlink debe funcionar (mismo filesystem). Si no, ABORTAR:
+# jamás copiar (duplicaría 148G y llenaría el disco).
+probe=$(find "$SRC" -mindepth 3 -maxdepth 3 -type f | head -1)
+[ -n "$probe" ] || die "No se encontró ningún blob para probar."
+ln "$probe" "$FLAT/.probe" 2>/dev/null \
+  || die "Hardlink imposible entre $SRC y $FLAT (¿filesystems distintos?). NO se copia nada. Ajusta FLAT_DIR a una ruta del MISMO filesystem que los datos y reintenta."
+rm -f "$FLAT/.probe"
+# ln por lotes; los errores no se ocultan. Nunca se copia.
+find "$SRC" -mindepth 3 -maxdepth 3 -type f -exec ln -t "$FLAT" {} + 2>"$FLAT/.ln-errors" || true
+if [ -s "$FLAT/.ln-errors" ]; then
+  warn "Algunos hardlinks fallaron ($(wc -l < "$FLAT/.ln-errors") errores). Primeras líneas:"
+  head -3 "$FLAT/.ln-errors" >&2
 fi
+rm -f "$FLAT/.ln-errors"
 nflat=$(find "$FLAT" -maxdepth 1 -type f | wc -l | tr -d ' ')
-info "Índice plano listo: $nflat archivos"
+info "Índice plano listo: $nflat archivos (hardlinks, 0 bytes duplicados)"
+[ "$nflat" -gt 0 ] || die "El índice plano quedó vacío. Abortando."
 [ "$nflat" = "$n_blobs" ] || warn "Índice ($nflat) != blobs locales ($n_blobs). Si difiere mucho, detente y avísame."
 
 step "2/3 Subiendo a B2 con rclone (paralelo, reanudable)"

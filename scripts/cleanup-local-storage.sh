@@ -28,7 +28,8 @@ SRC="${CHATWOOT_STORAGE_PATH:?Falta CHATWOOT_STORAGE_PATH en .env}"
 
 CHECK_ONLY=false; [ "${1:-}" = "--check" ] && CHECK_ONLY=true
 RCLONE_IMAGE="${RCLONE_IMAGE:-rclone/rclone:latest}"
-FLAT="${FLAT_DIR:-/tmp/cw-flat-check}"
+# Mismo filesystem que los datos: hardlinks garantizados, jamás copias.
+FLAT="${FLAT_DIR:-$(dirname "$SRC")/.cw-flat-check}"
 
 SERVICE="chatwoot"
 cont=$(svc_container "$SERVICE" SRC)
@@ -47,10 +48,12 @@ log "BD OK: 0 blobs en 'local'."
 
 step "COMPUERTA 2/3: cotejo COMPLETO local vs B2 (rclone check, tamaño+hash)"
 rm -rf "$FLAT"; mkdir -p "$FLAT"
-if ! find "$SRC" -mindepth 3 -maxdepth 3 -type f -exec ln -t "$FLAT" {} + 2>/dev/null; then
-  find "$SRC" -mindepth 3 -maxdepth 3 -type f -exec sh -c \
-    'for f; do ln "$f" "'"$FLAT"'/$(basename "$f")" 2>/dev/null || cp "$f" "'"$FLAT"'/"; done' _ {} +
-fi
+probe=$(find "$SRC" -mindepth 3 -maxdepth 3 -type f | head -1)
+[ -n "$probe" ] || die "No hay blobs locales que cotejar."
+ln "$probe" "$FLAT/.probe" 2>/dev/null \
+  || die "Hardlink imposible entre $SRC y $FLAT (¿filesystems distintos?). Ajusta FLAT_DIR al MISMO filesystem. NO se copia nada."
+rm -f "$FLAT/.probe"
+find "$SRC" -mindepth 3 -maxdepth 3 -type f -exec ln -t "$FLAT" {} + 2>/dev/null || true
 nflat=$(find "$FLAT" -maxdepth 1 -type f | wc -l | tr -d ' ')
 info "Cotejando $nflat archivos contra s3:$STORAGE_BUCKET_NAME ..."
 set +e
