@@ -48,6 +48,9 @@ load_env() {
     val="${val%$'\r'}"
     if [[ "$val" == \"*\" ]]; then val="${val#\"}"; val="${val%\"}"; fi
     if [[ "$val" == \'*\' ]]; then val="${val#\'}"; val="${val%\'}"; fi
+    # recortar espacios/tabs/CR al inicio y final (evita keys "malformed" por pegado)
+    val="${val#"${val%%[![:space:]]*}"}"
+    val="${val%"${val##*[![:space:]]}"}"
     export "$key=$val"
   done < "$f"
 }
