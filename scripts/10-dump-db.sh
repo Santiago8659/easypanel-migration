@@ -64,6 +64,9 @@ upload_latest() {
 
 if $STREAM; then
   step "Streaming pg_dump -> B2 (sin disco local)"
+  warn "aws-cli NO muestra progreso en modo no-interactivo: es NORMAL que no veas nada"
+  warn "mientras sube. Para confirmar que va, en otra terminal: docker ps | grep aws-cli"
+  info "Subiendo... (esto puede tardar varios minutos según tu ancho de banda)"
   pg pg_dump -d "$db" -Fc --no-owner --no-privileges \
     | awscli s3 cp - "$(s3_base)/$SERVICE/$file"
   upload_latest
