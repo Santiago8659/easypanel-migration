@@ -36,10 +36,10 @@ SRC="${CHATWOOT_STORAGE_PATH:?Falta CHATWOOT_STORAGE_PATH en .env}"
 [ -d "$SRC" ] || die "No existe la carpeta de storage: $SRC"
 
 RCLONE_IMAGE="${RCLONE_IMAGE:-rclone/rclone:latest}"
-# El índice plano vive JUNTO a los datos (mismo filesystem): así los hardlinks
-# funcionan siempre y NUNCA se copian datos. Jamás usar /tmp (puede ser tmpfs
-# u otro fs, y un fallback a copia llenaría el disco).
-FLAT="${FLAT_DIR:-$(dirname "$SRC")/.cw-flat-index}"
+# El índice plano vive DENTRO de _data (por definición el mismo filesystem,
+# aunque el volumen sea un mount aparte): hardlinks garantizados, 0 copias.
+# Sus archivos quedan a profundidad 2, así que el find -mindepth 3 no los ve.
+FLAT="${FLAT_DIR:-$SRC/.cw-flat-index}"
 DRY_RUN=false; [ "${1:-}" = "--dry-run" ] && DRY_RUN=true
 
 rclone_s3() {
@@ -54,9 +54,9 @@ rclone_s3() {
 }
 
 step "Adjuntos locales: $SRC  ->  B2 bucket: $STORAGE_BUCKET_NAME"
-n_blobs=$(find "$SRC" -mindepth 3 -maxdepth 3 -type f | wc -l | tr -d ' ')
-n_deep=$(find "$SRC" -mindepth 4 -type f 2>/dev/null | wc -l | tr -d ' ')
-n_shallow=$(find "$SRC" -maxdepth 2 -type f 2>/dev/null | wc -l | tr -d ' ')
+n_blobs=$(find "$SRC" -mindepth 3 -maxdepth 3 -type f -not -path '*/.cw-flat-*' | wc -l | tr -d ' ')
+n_deep=$(find "$SRC" -mindepth 4 -type f -not -path '*/.cw-flat-*' 2>/dev/null | wc -l | tr -d ' ')
+n_shallow=$(find "$SRC" -maxdepth 2 -type f -not -path '*/.cw-flat-*' 2>/dev/null | wc -l | tr -d ' ')
 info "Blobs (profundidad 3, se suben):        $n_blobs"
 info "Variants legacy (>3, se EXCLUYEN):      $n_deep  (Rails los regenera solo)"
 [ "$n_shallow" != "0" ] && warn "Archivos sueltos a profundidad <3: $n_shallow (se excluyen; revisa qué son)"
@@ -73,13 +73,13 @@ rm -rf "$FLAT"; mkdir -p "$FLAT"
 # jamás copiar (duplicaría 148G y llenaría el disco).
 # -print -quit: toma el primero y corta limpio (un pipe a head con 93k archivos
 # genera SIGPIPE en find y con pipefail mata el script en silencio).
-probe=$(find "$SRC" -mindepth 3 -maxdepth 3 -type f -print -quit)
+probe=$(find "$SRC" -mindepth 3 -maxdepth 3 -type f -not -path "*/.cw-flat-*" -print -quit)
 [ -n "$probe" ] || die "No se encontró ningún blob para probar."
 ln "$probe" "$FLAT/.probe" 2>/dev/null \
   || die "Hardlink imposible entre $SRC y $FLAT (¿filesystems distintos?). NO se copia nada. Ajusta FLAT_DIR a una ruta del MISMO filesystem que los datos y reintenta."
 rm -f "$FLAT/.probe"
 # ln por lotes; los errores no se ocultan. Nunca se copia.
-find "$SRC" -mindepth 3 -maxdepth 3 -type f -exec ln -t "$FLAT" {} + 2>"$FLAT/.ln-errors" || true
+find "$SRC" -mindepth 3 -maxdepth 3 -type f -not -path '*/.cw-flat-*' -exec ln -t "$FLAT" {} + 2>"$FLAT/.ln-errors" || true
 if [ -s "$FLAT/.ln-errors" ]; then
   warn "Algunos hardlinks fallaron ($(wc -l < "$FLAT/.ln-errors") errores). Primeras líneas:"
   head -3 "$FLAT/.ln-errors" >&2
