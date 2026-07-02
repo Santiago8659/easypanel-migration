@@ -48,7 +48,7 @@ log "BD OK: 0 blobs en 'local'."
 
 step "COMPUERTA 2/3: cotejo COMPLETO local vs B2 (rclone check, tamaño+hash)"
 rm -rf "$FLAT"; mkdir -p "$FLAT"
-probe=$(find "$SRC" -mindepth 3 -maxdepth 3 -type f | head -1)
+probe=$(find "$SRC" -mindepth 3 -maxdepth 3 -type f -print -quit)
 [ -n "$probe" ] || die "No hay blobs locales que cotejar."
 ln "$probe" "$FLAT/.probe" 2>/dev/null \
   || die "Hardlink imposible entre $SRC y $FLAT (¿filesystems distintos?). Ajusta FLAT_DIR al MISMO filesystem. NO se copia nada."

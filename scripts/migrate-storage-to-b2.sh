@@ -71,7 +71,9 @@ step "1/3 Creando índice plano (hardlinks; NO duplica datos en disco)"
 rm -rf "$FLAT"; mkdir -p "$FLAT"
 # Sanity: el hardlink debe funcionar (mismo filesystem). Si no, ABORTAR:
 # jamás copiar (duplicaría 148G y llenaría el disco).
-probe=$(find "$SRC" -mindepth 3 -maxdepth 3 -type f | head -1)
+# -print -quit: toma el primero y corta limpio (un pipe a head con 93k archivos
+# genera SIGPIPE en find y con pipefail mata el script en silencio).
+probe=$(find "$SRC" -mindepth 3 -maxdepth 3 -type f -print -quit)
 [ -n "$probe" ] || die "No se encontró ningún blob para probar."
 ln "$probe" "$FLAT/.probe" 2>/dev/null \
   || die "Hardlink imposible entre $SRC y $FLAT (¿filesystems distintos?). NO se copia nada. Ajusta FLAT_DIR a una ruta del MISMO filesystem que los datos y reintenta."
